@@ -41,10 +41,10 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   const [isAssistantEnabled, setIsAssistantEnabled] = useState(() => {
-    return localStorage.getItem("convo_voice_assistant_enabled") !== "false";
+    return localStorage.getItem("convo_voice_assistant_enabled") === "true";
   });
   const [assistantState, setAssistantState] = useState<AssistantState>(() => {
-    const isEnabled = localStorage.getItem("convo_voice_assistant_enabled") !== "false";
+    const isEnabled = localStorage.getItem("convo_voice_assistant_enabled") === "true";
     return isEnabled ? "LISTENING_FOR_WAKE" : "OFF";
   });
   const [detectedLanguage, setDetectedLanguage] = useState("en-IN");

@@ -1,7 +1,8 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { VoiceAssistantProvider } from "../../contexts/VoiceAssistantContext";
-import HandsFreeVoiceAssistant from "../accessibility/HandsFreeVoiceAssistant";
+// AI Voice Assistant widget temporarily disabled for now
+// import HandsFreeVoiceAssistant from "../accessibility/HandsFreeVoiceAssistant";
 
 export default function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -21,7 +22,6 @@ export default function ProtectedRoute() {
   return (
     <VoiceAssistantProvider>
       <Outlet />
-      <HandsFreeVoiceAssistant />
     </VoiceAssistantProvider>
   );
 }

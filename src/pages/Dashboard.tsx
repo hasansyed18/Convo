@@ -12,16 +12,13 @@ import {
   Bot,
   MessageSquare,
   Users,
-  Eye,
 } from "lucide-react";
 import NetworkStatusBanner from "../components/common/NetworkStatusBanner";
 import AccessibilityToolbar from "../components/accessibility/AccessibilityToolbar";
-import { useVoiceAssistant } from "../contexts/VoiceAssistantContext";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { setEyesFreeMode } = useVoiceAssistant();
 
   async function handleLogout() {
     await logoutUser();
@@ -60,16 +57,6 @@ export default function Dashboard() {
           </div>
 
           <button
-            type="button"
-            onClick={() => setEyesFreeMode(true)}
-            title="Open Eyes-Free Mode for Blind Users"
-            className="flex items-center gap-1.5 rounded-2xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 px-3.5 py-2 text-xs font-bold transition duration-150 active:scale-95 shadow-sm"
-          >
-            <Eye size={14} />
-            <span className="hidden sm:inline">Eyes-Free Mode</span>
-          </button>
-
-          <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/80 hover:bg-rose-500/10 hover:border-rose-500/40 hover:text-rose-400 px-4 py-2 text-xs font-bold transition duration-150 active:scale-95 shadow-sm"
           >
@@ -99,9 +86,6 @@ export default function Dashboard() {
 
             {/* Engine Readiness Status Pills */}
             <div className="pt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
-              <span className="flex items-center gap-1.5 rounded-xl bg-slate-950/80 border border-cyan-500/40 text-cyan-300 px-3 py-1 font-mono">
-                <Mic size={12} className="text-cyan-400" /> "Hey Convo" Voice Assistant: Active
-              </span>
               <span className="flex items-center gap-1.5 rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-1 font-mono">
                 <Mic size={12} className="text-blue-400" /> STT Speech: 16 Languages
               </span>
