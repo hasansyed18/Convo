@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // User profile images
+    match /users/{userId}/{allPaths=**} {
+      // Anyone authenticated can view user avatars
+      allow read: if isAuthenticated();
+      // Only the user can upload or edit their own photos
+      allow write: if isAuthenticated() && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024 // 5MB max
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Default deny for anything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
