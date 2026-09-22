@@ -27,12 +27,13 @@ export default function Login() {
       }
 
       navigate("/chats");
-    } catch (error: any) {
-  console.error("Login error:", error);
+    } catch (error: unknown) {
+      console.error("Login error:", error);
 
-  let message: string;
+      let message: string;
+      const firebaseError = error as { code?: string; message?: string };
 
-  switch (error?.code) {
+      switch (firebaseError?.code) {
     case "auth/invalid-credential":
     case "auth/wrong-password":
       message = "Incorrect email or password.";
@@ -63,7 +64,7 @@ export default function Login() {
 
     default:
       message =
-        error?.message ||
+        firebaseError?.message ||
         "Unable to sign in. Please try again.";
   }
 

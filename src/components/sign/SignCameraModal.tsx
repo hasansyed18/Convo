@@ -221,8 +221,7 @@ export default function SignCameraModal({ onInsertText, onClose }: SignCameraMod
         </div>
 
         {/* Modal Body */}
-        {activeTab === "camera" ? (
-          <div className="flex flex-col flex-1 overflow-hidden">
+        <div className={`flex flex-col flex-1 overflow-hidden ${activeTab === "camera" ? "" : "hidden"}`}>
             {/* Camera Feed & Landmark Canvas */}
             <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
               {cameraError ? (
@@ -437,9 +436,9 @@ export default function SignCameraModal({ onInsertText, onClose }: SignCameraMod
               </div>
             )}
           </div>
-        ) : (
-          /* Vocabulary Guide Tab */
-          <div className="p-5 bg-slate-950 space-y-4 overflow-y-auto max-h-[70vh]">
+
+          {/* Vocabulary Guide Tab */}
+          <div className={`p-5 bg-slate-950 space-y-4 overflow-y-auto max-h-[70vh] ${activeTab === "guide" ? "" : "hidden"}`}>
             <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4">
               <h4 className="font-bold text-sm text-emerald-400 mb-1 flex items-center gap-1.5">
                 <CheckCircle2 size={16} /> Controlled MVP Sign Vocabulary (Calibrated Rules)
@@ -455,16 +454,15 @@ export default function SignCameraModal({ onInsertText, onClose }: SignCameraMod
               {Object.values(SIGN_VOCABULARY).map((item) => (
                 <div
                   key={item.signId}
-                  className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 flex flex-col justify-between hover:border-emerald-500/40 transition"
+                  className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">{item.emoji}</span>
-                        <h5 className="font-bold text-sm text-white">{item.label}</h5>
-                      </div>
-                      <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2 py-0.5">
-                        {item.language}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-sm text-white flex items-center gap-1.5">
+                        <span className="text-lg">{item.emoji}</span> {item.label}
+                      </span>
+                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-mono text-emerald-400">
+                        {item.signId}
                       </span>
                     </div>
 
@@ -481,7 +479,6 @@ export default function SignCameraModal({ onInsertText, onClose }: SignCameraMod
               ))}
             </div>
           </div>
-        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950 px-5 py-3">

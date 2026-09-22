@@ -24,10 +24,11 @@ export default function Register() {
       await registerUser(name, email, password);
 
       navigate("/verify-email");
-    } catch (error: any) {
+    } catch (error: unknown) {
       setError(
-        error?.message ||
-          "Unable to create your account."
+        error instanceof Error
+          ? error.message
+          : "Unable to create your account."
       );
     } finally {
       setLoading(false);

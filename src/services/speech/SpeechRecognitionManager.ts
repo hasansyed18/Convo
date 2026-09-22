@@ -56,7 +56,10 @@ export class SpeechRecognitionManager {
     provider.setLanguage(lang);
   }
 
-  public async start(callbacks: SpeechRecognitionCallbacks): Promise<boolean> {
+  public async start(
+    callbacks: SpeechRecognitionCallbacks,
+    options?: { continuous?: boolean; interimResults?: boolean }
+  ): Promise<boolean> {
     const provider = this.getActiveProvider();
     this.activeCallbacks = callbacks;
 
@@ -94,8 +97,8 @@ export class SpeechRecognitionManager {
 
     return provider.start({
       language: this.currentLanguage,
-      continuous: false,
-      interimResults: true,
+      continuous: options?.continuous ?? true,
+      interimResults: options?.interimResults ?? true,
       callbacks: providerCallbacks,
     });
   }

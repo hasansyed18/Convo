@@ -141,10 +141,9 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
       const isMobile = this.isMobileDevice();
 
       instance.lang = this.currentLanguage;
-      // On mobile browsers (Android Chrome, iOS Safari), continuous: true causes audio
-      // buffering without intermediate flushes. Single-shot with auto-restart on onend
-      // ensures instantaneous responsiveness.
-      instance.continuous = isMobile ? false : (this.activeOptions?.continuous ?? true);
+      // Modern Android Chrome and desktop support continuous: true.
+      // iOS WebKit treats continuous as single-shot and halts on silence; auto-restart on onend handles it.
+      instance.continuous = this.activeOptions?.continuous ?? true;
       instance.interimResults = this.activeOptions?.interimResults ?? true;
       instance.maxAlternatives = 1;
 
@@ -239,7 +238,7 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
 
         // If user hasn't explicitly stopped, restart via a brand-new instance
         if (this.isRunning) {
-          const delay = isMobile ? 80 : 30;
+          const delay = isMobile ? 350 : 60;
           this.restartTimeout = setTimeout(() => {
             if (this.isRunning) {
               this.initAndStartInstance();
@@ -254,11 +253,35 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
       };
 
       this.recognitionInstance = instance;
-      instance.start();
+      try {
+        instance.start();
+      } catch (startErr: unknown) {
+        const msg = startErr instanceof Error ? startErr.message : String(startErr);
+        if (msg.includes("already started") || msg.includes("InvalidStateError")) {
+          // Hardware/service was still busy from previous session, retry after short backoff
+          if (this.restartTimeout) clearTimeout(this.restartTimeout);
+          this.restartTimeout = setTimeout(() => {
+            if (this.isRunning) {
+              this.initAndStartInstance();
+            }
+          }, 350);
+          return true;
+        }
+        throw startErr;
+      }
       return true;
     } catch (err: unknown) {
       if (!this.isRunning) return false;
       const message = err instanceof Error ? err.message : "Failed to start speech recognition.";
+      if (message.includes("already started") || message.includes("InvalidStateError")) {
+        if (this.restartTimeout) clearTimeout(this.restartTimeout);
+        this.restartTimeout = setTimeout(() => {
+          if (this.isRunning) {
+            this.initAndStartInstance();
+          }
+        }, 350);
+        return false;
+      }
       const errCode = this.mapErrorCode(message);
       this.isRunning = false;
       this.activeCallbacks?.onStateChange("ERROR");

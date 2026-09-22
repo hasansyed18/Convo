@@ -47,8 +47,8 @@ interface Conversation {
   lastMessage?: string;
   lastMessageSenderId?: string;
 
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: { seconds: number; nanoseconds: number } | null;
+  updatedAt?: { seconds: number; nanoseconds: number } | null;
 }
 
 interface FriendRequest {
@@ -64,8 +64,17 @@ interface FriendRequest {
 
   status: "pending" | "accepted" | "declined";
 
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: { seconds: number; nanoseconds: number } | null;
+  updatedAt?: { seconds: number; nanoseconds: number } | null;
+}
+
+interface UserProfile {
+  id?: string;
+  uid: string;
+  name: string;
+  email: string;
+  photoURL?: string | null;
+  [key: string]: unknown;
 }
 
 export default function Chats() {
@@ -485,7 +494,7 @@ function AddFriendModal({
     useState(false);
 
   const [result, setResult] =
-    useState<any>(null);
+    useState<UserProfile | null>(null);
 
   const [message, setMessage] =
     useState("");
@@ -525,7 +534,7 @@ function AddFriendModal({
        * Search emailLower.
        */
 
-      let foundUser: any = null;
+      let foundUser: UserProfile | null = null;
 
       const lowerQuery = query(
         usersRef,
@@ -547,8 +556,10 @@ function AddFriendModal({
 
         foundUser = {
           uid: document.id,
+          name: document.data().name || "User",
+          email: document.data().email || "",
           ...document.data(),
-        };
+        } as UserProfile;
       }
 
       /*
@@ -578,8 +589,10 @@ function AddFriendModal({
 
           foundUser = {
             uid: document.id,
+            name: document.data().name || "User",
+            email: document.data().email || "",
             ...document.data(),
-          };
+          } as UserProfile;
         }
       }
 
@@ -615,8 +628,10 @@ function AddFriendModal({
           ) {
             foundUser = {
               uid: document.id,
+              name: data.name || "User",
+              email: data.email || "",
               ...data,
-            };
+            } as UserProfile;
 
             break;
           }
@@ -657,18 +672,19 @@ function AddFriendModal({
 
       setError(false);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
 
       console.error(
         "🔥 SEARCH ERROR:",
         error
       );
 
-      setMessage(
-        error?.message ||
-          "Unable to search users."
-      );
+      const errMessage =
+        error instanceof Error
+          ? error.message
+          : "Unable to search users.";
 
+      setMessage(errMessage);
       setError(true);
 
     } finally {
@@ -703,18 +719,19 @@ function AddFriendModal({
         1000
       );
 
-    } catch (error: any) {
+    } catch (error: unknown) {
 
       console.error(
         "Request error:",
         error
       );
 
-      setMessage(
-        error?.message ||
-          "Could not send request."
-      );
+      const errMessage =
+        error instanceof Error
+          ? error.message
+          : "Could not send request.";
 
+      setMessage(errMessage);
       setError(true);
 
     } finally {
@@ -952,17 +969,19 @@ function FriendRequestsModal({
           )
       );
 
-    } catch (error: any) {
+    } catch (error: unknown) {
 
       console.error(
         "🔥 ACCEPT REQUEST ERROR:",
         error
       );
 
-      alert(
-        error?.message ||
-          "Unable to accept request."
-      );
+      const errMessage =
+        error instanceof Error
+          ? error.message
+          : "Unable to accept request.";
+
+      alert(errMessage);
 
     } finally {
       setProcessingId(null);
@@ -1138,7 +1157,7 @@ function FriendRequestsModal({
 ============================================ */
 
 function formatTime(
-  timestamp: any
+  timestamp?: { seconds: number; nanoseconds?: number } | null
 ) {
   if (!timestamp?.seconds) {
     return "";

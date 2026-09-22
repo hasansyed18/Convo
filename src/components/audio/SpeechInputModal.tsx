@@ -132,7 +132,13 @@ export default function SpeechInputModal({
       },
       onFinalResult: (text, conf) => {
         if (isMountedRef.current) {
-          setTranscript((prev) => (prev ? `${prev} ${text}` : text));
+          setTranscript((prev) => {
+            const cleanText = text.trim();
+            if (!cleanText) return prev;
+            // Prevent duplicate word appending if text already ends with this phrase
+            if (prev.endsWith(cleanText)) return prev;
+            return prev ? `${prev} ${cleanText}` : cleanText;
+          });
           setInterimTranscript("");
           if (conf > 0) setConfidence(conf);
         }
@@ -166,6 +172,15 @@ export default function SpeechInputModal({
       isMountedRef.current = false;
       clearTimeout(timer);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaRecorderRef.current) {
+        if (mediaRecorderRef.current.state !== "inactive") {
+          try { mediaRecorderRef.current.stop(); } catch { /* ignore */ }
+        }
+        if (mediaRecorderRef.current.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+        }
+        mediaRecorderRef.current = null;
+      }
       speechRecognitionManager.stop();
       audioNoiseService.stopAnalyzing();
     };
@@ -613,7 +628,13 @@ export default function SpeechInputModal({
 
             <textarea
               ref={textareaRef}
-              value={transcript + (interimTranscript ? ` ${interimTranscript}` : "")}
+              value={
+                interimTranscript
+                  ? transcript
+                    ? `${transcript} ${interimTranscript}`
+                    : interimTranscript
+                  : transcript
+              }
               onChange={(e) => {
                 setTranscript(e.target.value);
                 setInterimTranscript("");

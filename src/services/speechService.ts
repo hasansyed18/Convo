@@ -84,23 +84,27 @@ class SpeechServiceFacade {
   public playAudioCue(type: "sent" | "received" | "mic-start" | "mic-stop" | "sign-detected" | "alert"): void {
     try {
       if (typeof window === "undefined") return;
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const win = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+      const AudioCtx = win.AudioContext || win.webkitAudioContext;
       if (!AudioCtx) return;
 
       if (!this.audioContext) {
         this.audioContext = new AudioCtx();
       }
 
-      if (this.audioContext.state === "suspended") {
-        this.audioContext.resume();
+      const ctx = this.audioContext;
+      if (!ctx) return;
+
+      if (ctx.state === "suspended") {
+        void ctx.resume().catch(() => {});
       }
 
-      const now = this.audioContext.currentTime;
-      const osc = this.audioContext.createOscillator();
-      const gain = this.audioContext.createGain();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
       osc.connect(gain);
-      gain.connect(this.audioContext.destination);
+      gain.connect(ctx.destination);
 
       switch (type) {
         case "sent":

@@ -115,7 +115,7 @@ export class SignRecognitionPipeline {
       });
 
       this.videoElement.srcObject = this.stream;
-      await this.videoElement.play();
+      await this.videoElement.play().catch(() => {});
 
       // 2. Initialize MediaPipe HandLandmarker in background
       this.extractor.initialize().catch((err) => {

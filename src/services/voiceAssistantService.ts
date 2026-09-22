@@ -63,7 +63,7 @@ export class VoiceAssistantService {
       this.audioCtx = new AudioCtx();
     }
     if (this.audioCtx.state === "suspended") {
-      void this.audioCtx.resume();
+      void this.audioCtx.resume().catch(() => {});
     }
     return this.audioCtx;
   }

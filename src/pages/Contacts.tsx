@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Search, UserPlus } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Search, UserPlus, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../contexts/AuthContext";
 
@@ -9,49 +10,52 @@ import {
   searchUsers,
 } from "../services/contactService";
 
+interface ContactItem {
+  id: string;
+  uid?: string;
+  name: string;
+  email: string;
+}
+
 export default function Contacts() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const [contacts, setContacts] = useState<any[]>(
-    []
-  );
-
+  const [contacts, setContacts] = useState<ContactItem[]>([]);
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<any[]>(
-    []
-  );
+  const [results, setResults] = useState<ContactItem[]>([]);
 
-  useEffect(() => {
+  const loadContacts = useCallback(async () => {
     if (!user) return;
-
-    loadContacts();
+    const data = await getContacts(user.uid);
+    setContacts(data as ContactItem[]);
   }, [user]);
 
-  async function loadContacts() {
+  useEffect(() => {
+    let isMounted = true;
     if (!user) return;
-
-    const data = await getContacts(user.uid);
-
-    setContacts(data);
-  }
+    getContacts(user.uid)
+      .then((data) => {
+        if (isMounted) setContacts(data as ContactItem[]);
+      })
+      .catch((err) => console.warn("Could not load contacts:", err));
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   async function handleSearch() {
     if (!search.trim()) return;
 
-    const data = await searchUsers(
-      search.trim()
-    );
-
-    setResults(data);
+    const data = await searchUsers(search.trim());
+    setResults(data as ContactItem[]);
   }
 
-  async function handleAddContact(
-    contact: any
-  ) {
+  async function handleAddContact(contact: ContactItem) {
     if (!user) return;
 
     await addContact(user.uid, {
-      uid: contact.id,
+      uid: contact.id || contact.uid || "",
       name: contact.name,
       email: contact.email,
     });
@@ -64,12 +68,18 @@ export default function Contacts() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">
-
       <div className="max-w-3xl mx-auto">
-
-        <h1 className="text-3xl font-bold mb-6">
-          Contacts
-        </h1>
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="rounded-full p-2 text-slate-400 hover:text-white hover:bg-slate-900 transition"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-3xl font-bold">Contacts</h1>
+        </div>
 
         {/* Search */}
         <div className="flex gap-3 mb-8">

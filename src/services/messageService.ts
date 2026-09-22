@@ -10,6 +10,7 @@ import {
   getDocs,
   where,
   writeBatch,
+  type Timestamp,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -23,9 +24,9 @@ export interface StoredMessage {
   text: string;
   inputType: "text" | "speech" | "sign";
   status?: MessageStatus;
-  deliveredAt?: any;
-  readAt?: any;
-  createdAt?: any;
+  deliveredAt?: Timestamp | { seconds: number; nanoseconds: number } | null;
+  readAt?: Timestamp | { seconds: number; nanoseconds: number } | null;
+  createdAt?: Timestamp | { seconds: number; nanoseconds: number } | null;
 }
 
 export async function sendMessage(
@@ -103,7 +104,8 @@ export async function markConversationMessagesAsRead(
 
 export function subscribeToMessages(
   conversationId: string,
-  callback: (messages: StoredMessage[]) => void
+  callback: (messages: StoredMessage[]) => void,
+  onError?: (error: Error) => void
 ) {
   const messagesRef = collection(
     db,
@@ -117,12 +119,19 @@ export function subscribeToMessages(
     orderBy("createdAt", "asc")
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map((document) => ({
-      id: document.id,
-      ...document.data(),
-    })) as StoredMessage[];
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const messages = snapshot.docs.map((document) => ({
+        id: document.id,
+        ...document.data(),
+      })) as StoredMessage[];
 
-    callback(messages);
-  });
+      callback(messages);
+    },
+    (error) => {
+      console.warn("Firestore message subscription notice:", error);
+      onError?.(error);
+    }
+  );
 }

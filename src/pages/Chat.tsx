@@ -51,9 +51,9 @@ interface ChatMessage {
   text: string;
   inputType: "text" | "speech" | "sign";
   status?: "sent" | "delivered" | "read";
-  deliveredAt?: any;
-  readAt?: any;
-  createdAt?: any;
+  deliveredAt?: { seconds: number; nanoseconds?: number; toDate?: () => Date } | null;
+  readAt?: { seconds: number; nanoseconds?: number; toDate?: () => Date } | null;
+  createdAt?: { seconds: number; nanoseconds?: number; toDate?: () => Date } | null;
 }
 
 const QUICK_ASSISTIVE_PHRASES = [
@@ -167,6 +167,8 @@ export default function Chat() {
       }
 
       prevMessagesCountRef.current = data.length;
+    }, (error) => {
+      console.warn("Could not subscribe to messages:", error);
     });
 
     return unsubscribe;
@@ -380,8 +382,11 @@ export default function Chat() {
             const isMine = message.senderId === user.uid;
 
             let timeStr = "";
-            if (message.createdAt?.toDate) {
+            if (typeof message.createdAt?.toDate === "function") {
               const d = message.createdAt.toDate();
+              timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            } else if (message.createdAt?.seconds) {
+              const d = new Date(message.createdAt.seconds * 1000);
               timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
             }
 
