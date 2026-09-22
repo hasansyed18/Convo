@@ -280,3 +280,4 @@ export function getAssistantStrings(langCode: string): LocalizedAssistantStrings
   }
   return ASSISTANT_TRANSLATIONS["en-IN"];
 }
+
