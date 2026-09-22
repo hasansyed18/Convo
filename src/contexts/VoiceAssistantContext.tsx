@@ -131,6 +131,32 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           }
 
           case "READ_MESSAGES": {
+            const targetName = parsed.params?.targetName;
+            if (targetName) {
+              // User specifically asked: "read the last message from Sarah"
+              const lastMsg = await voiceAssistantService.getLastMessageFromContact(
+                user.uid,
+                targetName
+              );
+              if (!lastMsg) {
+                voiceAssistantService.playEarcon("error");
+                speakResponse(strings.chatNotFound(targetName), currentLang);
+              } else if (!lastMsg.text) {
+                voiceAssistantService.playEarcon("success");
+                navigate(`/chat/${lastMsg.conversationId}`);
+                speakResponse(
+                  `Opened conversation with ${lastMsg.contactName}, but there are no messages yet.`,
+                  currentLang
+                );
+              } else {
+                voiceAssistantService.playEarcon("success");
+                navigate(`/chat/${lastMsg.conversationId}`);
+                const readout = `The last message from ${lastMsg.contactName} was at ${lastMsg.timeStr}: "${lastMsg.text}". Would you like to reply?`;
+                speakResponse(readout, currentLang);
+              }
+              break;
+            }
+
             if (activeConversationId) {
               // Inside an active conversation -> read latest messages
               const { chatName, messages } =
@@ -158,7 +184,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
                 voiceAssistantService.playEarcon("success");
                 const summary =
                   strings.todayMessagesCount(count, senders) +
-                  " Say 'Open chat with' followed by a name to read or reply.";
+                  " Say 'Open chat with' or 'Read the last message from' followed by a name.";
                 speakResponse(summary, currentLang);
               }
             }
@@ -178,6 +204,46 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
             } else {
               voiceAssistantService.playEarcon("error");
               speakResponse(strings.chatNotFound(targetName), currentLang);
+            }
+            break;
+          }
+
+          case "SEND_MESSAGE": {
+            const targetName = parsed.params?.targetName || "";
+            const textToSend = parsed.params?.text || "";
+
+            const matched = await voiceAssistantService.findConversationByName(
+              user.uid,
+              targetName
+            );
+
+            if (!matched) {
+              voiceAssistantService.playEarcon("error");
+              speakResponse(strings.chatNotFound(targetName), currentLang);
+              break;
+            }
+
+            navigate(`/chat/${matched.conversationId}`);
+
+            if (textToSend) {
+              // User said "Send message to Sarah saying [text]"
+              const res = await voiceAssistantService.sendReply(
+                matched.conversationId,
+                user.uid,
+                textToSend
+              );
+              if (res.success) {
+                voiceAssistantService.playEarcon("success");
+                speakResponse(strings.messageSent(matched.contactName, textToSend), currentLang);
+              } else {
+                voiceAssistantService.playEarcon("error");
+                speakResponse(strings.sendFailed, currentLang);
+              }
+            } else {
+              // User said "Send message to Sarah" without message text -> prompt user!
+              voiceAssistantService.playEarcon("wake");
+              const prompt = `Opened conversation with ${matched.contactName}. What would you like to send?`;
+              speakResponse(prompt, currentLang);
             }
             break;
           }

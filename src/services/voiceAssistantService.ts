@@ -166,27 +166,27 @@ export class VoiceAssistantService {
     // 2. Lexical & Marker Matching for Latin alphabets
     const lower = trimmed.toLowerCase();
 
-    // Spanish markers
+    // Spanish markers (strict multi-word phrases or unambiguous greetings)
     if (
-      /\b(hola|mensajes?|abrir|cu[aá]ntos?|ayuda|responder|leer|gracias|por favor|qui[eé]n)\b/i.test(
+      /\b(hola\s+convo|buenos\s+d[ií]as|buenas\s+tardes|por\s+favor|muchas\s+gracias|cu[aá]ntos\s+mensajes|abre\s+el\s+chat|abrir\s+chat|lee\s+los\s+mensajes|habla\s+en\s+espa[ñn]ol)\b/i.test(
         lower
       )
     ) {
       return "es-ES";
     }
 
-    // French markers
+    // French markers (strict multi-word phrases - never isolated 'message'!)
     if (
-      /\b(bonjour|messages?|ouvrir|combien|aide|r[eé]pondre|lire|merci|s'il vous pla[iî]t)\b/i.test(
+      /\b(bonjour|salut\s+convo|s'il\s+vous\s+pla[iî]t|s'il\s+te\s+pla[iî]t|combien\s+de\s+messages|ouvre\s+le\s+chat|ouvrir\s+le\s+chat|lis\s+les\s+messages|lire\s+les\s+messages|parle\s+en\s+fran[çc]ais)\b/i.test(
         lower
       )
     ) {
       return "fr-FR";
     }
 
-    // German markers
+    // German markers (strict multi-word phrases)
     if (
-      /\b(hallo|nachrichten?|wieviele|hilfe|antworten|lesen|danke|bitte|[oö]ffnen)\b/i.test(
+      /\b(guten\s+tag|hallo\s+convo|wieviele\s+nachrichten|[oö]ffne\s+den\s+chat|nachrichten\s+vorlesen|sprich\s+deutsch)\b/i.test(
         lower
       )
     ) {
@@ -195,7 +195,7 @@ export class VoiceAssistantService {
 
     // Hinglish (Romanized Hindi)
     if (
-      /\b(namaste|kaise|kitne|sandesh|khol|bolo|batao|kripya|madad|jawab|karo)\b/i.test(
+      /\b(namaste|kaise\s+ho|kitne\s+message|kripya|madad\s+karo|sandesh\s+padho|jawab\s+do|batao)\b/i.test(
         lower
       )
     ) {
@@ -252,9 +252,9 @@ export class VoiceAssistantService {
       /\bmessages?\s+(today|received|new)\b/i.test(text) ||
       /\b(kitne|aaj ke)\s+(messages?|sandesh)\b/i.test(text) ||
       /\b(कितने|आज)\s*(मैसेज|संदेश)\b/i.test(text) ||
-      /\bcu[aá]ntos?\s+mensajes?\b/i.test(text) ||
-      /\bcombien\s+de\s+messages?\b/i.test(text) ||
-      /\bwieviel.*\bnachrichten?\b/i.test(text) ||
+      /\bcu[aá]ntos\s+mensajes\b/i.test(text) ||
+      /\bcombien\s+de\s+messages\b/i.test(text) ||
+      /\bwieviel.*\bnachrichten\b/i.test(text) ||
       /\bكم\s+عدد\s+الرسائل\b/i.test(text) ||
       /\bஎத்தனை\s+செய்தி\b/i.test(text) ||
       /\bఎన్ని\s+మెసేజ్\b/i.test(text)
@@ -263,14 +263,39 @@ export class VoiceAssistantService {
     }
 
     // 2. READ MESSAGES
+    // 2a. Specific contact: "read the last message from Sarah", "read message from John", "read Sarah's message"
+    const readFromRegex =
+      /\b(?:read|check|what did|what is)\s+(?:the\s+)?(?:last|latest|new)?\s*(?:message|messages|chat)?\s+(?:from|by|of)\s+([a-z0-9_\s]+?)$/i;
+    const readPossessiveRegex =
+      /\b(?:read|check|what did)\s+([a-z0-9_\s]+?)'s\s+(?:last|latest|new)?\s*(?:message|messages|chat)?$/i;
+    const hindiReadFromRegex =
+      /([\p{L}\p{N}_\s]+?)\s*(?:का|की|के)?\s*(?:अंतिम|आखिरी|नया)?\s*(?:मैसेज|संदेश)\s*(?:पढ़ो|सुनाओ)/iu;
+
+    const readFromMatch =
+      text.match(readFromRegex) ||
+      text.match(readPossessiveRegex) ||
+      text.match(hindiReadFromRegex);
+
+    if (readFromMatch && readFromMatch[1]) {
+      const candidate = readFromMatch[1].trim();
+      if (!/^(the|a|chat|conversation|messages?|last|latest)$/i.test(candidate)) {
+        return {
+          intent: "READ_MESSAGES",
+          params: { targetName: candidate },
+          detectedLanguage,
+        };
+      }
+    }
+
+    // 2b. General read messages command
     if (
       /\b(read|speak|listen to|what did.*say)\b.*\bmessages?\b/i.test(text) ||
       /\bread\s+(the\s+)?(chat|latest|last|un?read)\b/i.test(text) ||
       /\b(मैसेज|संदेश|बातचीत)\s*(पढ़ो|सुनाओ)\b/i.test(text) ||
       /\b(kya likha|padho|sunao)\b/i.test(text) ||
-      /\blee(r)?\s+(los\s+)?mensajes?\b/i.test(text) ||
-      /\blis(e)?\s+(les\s+)?messages?\b/i.test(text) ||
-      /\blies\s+(die\s+)?nachrichten?\b/i.test(text) ||
+      /\blee(r)?\s+(los\s+)?mensajes\b/i.test(text) ||
+      /\blis(e)?\s+(les\s+)?messages\b/i.test(text) ||
+      /\blies\s+(die\s+)?nachrichten\b/i.test(text) ||
       /\bاقرأ\s+الرسائل\b/i.test(text) ||
       /\bசெய்திகளைப்\s*படி\b/i.test(text) ||
       /\bమెసేజ్‌లు\s*చదువు\b/i.test(text)
@@ -301,7 +326,59 @@ export class VoiceAssistantService {
       };
     }
 
-    // 4. OPEN CHAT WITH [NAME]
+    // 4. SEND MESSAGE TO [NAME] (with or without pre-defined text)
+    // 4a. With text: "send message to Sarah saying I am coming", "tell Sarah I will be late"
+    const sendWithTextRegex =
+      /\b(?:send|compose)\s+(?:a\s+)?message\s+to\s+([a-z0-9_\s]+?)\s+(?:saying|with|that|:)\s+(.+)$/i;
+    const tellRegex =
+      /\btell\s+([a-z0-9_\s]+?)\s+(?:that|saying)?\s+(.+)$/i;
+    const hindiSendWithTextRegex =
+      /([\p{L}\p{N}_\s]+?)\s*(?:को)\s*(?:मैसेज|संदेश)?\s*(?:भेजो|कहो)\s*(?:कि)?\s*(.+)/iu;
+
+    const sendWithTextMatch =
+      text.match(sendWithTextRegex) ||
+      text.match(tellRegex) ||
+      text.match(hindiSendWithTextRegex);
+
+    if (sendWithTextMatch && sendWithTextMatch[1] && sendWithTextMatch[2]) {
+      return {
+        intent: "SEND_MESSAGE",
+        params: {
+          targetName: sendWithTextMatch[1].trim(),
+          text: sendWithTextMatch[2].trim(),
+        },
+        detectedLanguage,
+      };
+    }
+
+    // 4b. Prompt only: "send message to Sarah", "send a message to John", "message Sarah"
+    const sendPromptRegex =
+      /\b(?:send|compose)\s+(?:a\s+)?message\s+to\s+([a-z0-9_\s]+?)$/i;
+    const messageContactRegex =
+      /\b(?:message|text)\s+([a-z0-9_\s]+?)$/i;
+    const hindiSendPromptRegex =
+      /([\p{L}\p{N}_\s]+?)\s*(?:को)\s*(?:मैसेज|संदेश)\s*(?:भेजो|करना)/iu;
+
+    const sendPromptMatch =
+      text.match(sendPromptRegex) ||
+      text.match(messageContactRegex) ||
+      text.match(hindiSendPromptRegex);
+
+    if (sendPromptMatch && sendPromptMatch[1]) {
+      const candidate = sendPromptMatch[1].trim();
+      if (!/^(the|a|chat|conversation|messages?|dashboard|home|contacts?)$/i.test(candidate)) {
+        return {
+          intent: "SEND_MESSAGE",
+          params: {
+            targetName: candidate,
+            text: "",
+          },
+          detectedLanguage,
+        };
+      }
+    }
+
+    // 5. OPEN CHAT WITH [NAME]
     const openChatRegex =
       /\b(?:open|show|start|go to)(?:\s+chat|\s+conversation)?\s+(?:with\s+)?([a-z0-9_\s]+?)(?:'s\s+chat)?$/i;
     const hindiOpenChatRegex =
@@ -323,21 +400,6 @@ export class VoiceAssistantService {
           detectedLanguage,
         };
       }
-    }
-
-    // 5. SEND MESSAGE TO [NAME] SAYING [TEXT]
-    const sendToRegex =
-      /\bsend\s+(?:a\s+)?message\s+to\s+([a-z0-9_\s]+?)\s+(?:saying|with|that)\s+(.+)$/i;
-    const sendToMatch = text.match(sendToRegex);
-    if (sendToMatch && sendToMatch[1] && sendToMatch[2]) {
-      return {
-        intent: "SEND_MESSAGE",
-        params: {
-          targetName: sendToMatch[1].trim(),
-          text: sendToMatch[2].trim(),
-        },
-        detectedLanguage,
-      };
     }
 
     // 6. NAVIGATION
@@ -556,6 +618,72 @@ export class VoiceAssistantService {
       return null;
     } catch (err) {
       console.warn("Error finding conversation:", err);
+      return null;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // FIRESTORE OPERATIONS: GET LAST MESSAGE FROM SPECIFIC CONTACT
+  // --------------------------------------------------------------------------
+  public async getLastMessageFromContact(
+    userId: string,
+    targetName: string
+  ): Promise<{
+    found: boolean;
+    conversationId: string;
+    contactName: string;
+    text: string;
+    senderName: string;
+    timeStr: string;
+  } | null> {
+    try {
+      const match = await this.findConversationByName(userId, targetName);
+      if (!match) return null;
+
+      const msgQuery = query(
+        collection(db, "conversations", match.conversationId, "messages"),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+      const msgSnap = await getDocs(msgQuery);
+
+      if (msgSnap.empty) {
+        return {
+          found: true,
+          conversationId: match.conversationId,
+          contactName: match.contactName,
+          text: "",
+          senderName: match.contactName,
+          timeStr: "",
+        };
+      }
+
+      // Prioritize the last message sent by the other contact
+      let selectedDoc = msgSnap.docs.find((d) => d.data().senderId !== userId);
+      if (!selectedDoc) {
+        selectedDoc = msgSnap.docs[0];
+      }
+
+      const mData = selectedDoc.data();
+      const senderName =
+        mData.senderId === userId ? "You" : match.contactName;
+
+      let timeStr = "recently";
+      if (mData.createdAt?.toDate) {
+        const d = mData.createdAt.toDate();
+        timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      return {
+        found: true,
+        conversationId: match.conversationId,
+        contactName: match.contactName,
+        text: mData.text || "",
+        senderName,
+        timeStr,
+      };
+    } catch (err) {
+      console.warn("Error in getLastMessageFromContact:", err);
       return null;
     }
   }

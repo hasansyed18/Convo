@@ -9,6 +9,7 @@ import {
   Mic,
   Send,
   Volume2,
+  X,
 } from "lucide-react";
 
 import {
@@ -26,6 +27,7 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   sendMessage,
   subscribeToMessages,
+  markConversationMessagesAsRead,
 } from "../services/messageService";
 import { speechService } from "../services/speechService";
 import SignCameraModal from "../components/sign/SignCameraModal";
@@ -48,6 +50,9 @@ interface ChatMessage {
   receiverId: string;
   text: string;
   inputType: "text" | "speech" | "sign";
+  status?: "sent" | "delivered" | "read";
+  deliveredAt?: any;
+  readAt?: any;
   createdAt?: any;
 }
 
@@ -80,6 +85,10 @@ export default function Chat() {
 
   // Visual alert flash
   const [flashAlert, setFlashAlert] = useState(false);
+  const [newMessageAlert, setNewMessageAlert] = useState<{
+    senderName: string;
+    text: string;
+  } | null>(null);
 
   // Settings
   const [settings, setSettings] = useState(() =>
@@ -120,10 +129,13 @@ export default function Chat() {
    * Load Messages & Sound/Visual Alerts
    */
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !user) return;
 
     const unsubscribe = subscribeToMessages(conversationId, (data) => {
       setMessages(data as ChatMessage[]);
+
+      // Mark unread incoming messages as read
+      void markConversationMessagesAsRead(conversationId, user.uid);
 
       // Check if new incoming message arrived
       if (prevMessagesCountRef.current > 0 && data.length > prevMessagesCountRef.current) {
@@ -133,6 +145,13 @@ export default function Chat() {
           if (settings.audioCues) {
             speechService.playAudioCue("received");
           }
+
+          // Trigger WhatsApp-style new message toast alert
+          setNewMessageAlert({
+            senderName: "Friend",
+            text: lastMsg.text,
+          });
+          setTimeout(() => setNewMessageAlert(null), 5000);
 
           // Visual Flash for deaf users
           if (settings.visualAlerts) {
@@ -302,9 +321,47 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* MESSAGES LIST */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
+      {/* WhatsApp-Style New Message Toast Alert */}
+      {newMessageAlert && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md rounded-2xl bg-slate-900/95 border border-emerald-500/40 p-3.5 shadow-2xl backdrop-blur-md animate-in slide-in-from-top duration-300 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0 text-lg shadow-inner">
+              💬
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-emerald-400 truncate">
+                New message from {otherUserName}
+              </p>
+              <p className="text-xs text-white truncate">{newMessageAlert.text}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                speechService.speak(newMessageAlert.text);
+                setNewMessageAlert(null);
+              }}
+              title="Listen to message aloud"
+              className="flex items-center gap-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black px-2.5 py-1 text-xs font-bold transition shadow"
+            >
+              <Volume2 size={12} />
+              <span>Listen</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewMessageAlert(null)}
+              className="rounded-xl p-1 text-slate-400 hover:text-white transition"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MESSAGES SCROLL AREA */}
+      <main className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin">
+        <div className="mx-auto max-w-3xl space-y-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-500/10 text-3xl">
@@ -321,6 +378,12 @@ export default function Chat() {
 
           {messages.map((message) => {
             const isMine = message.senderId === user.uid;
+
+            let timeStr = "";
+            if (message.createdAt?.toDate) {
+              const d = message.createdAt.toDate();
+              timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            }
 
             return (
               <div
@@ -344,11 +407,41 @@ export default function Chat() {
                       isMine ? "border-black/15 text-black/80" : "border-slate-800 text-slate-400"
                     }`}
                   >
-                    <span className="flex items-center gap-1 font-semibold uppercase tracking-wider text-[10px]">
-                      {message.inputType === "sign" && "🤟 Sign Language"}
-                      {message.inputType === "speech" && "🎙️ Speech-to-Text"}
-                      {message.inputType === "text" && "⌨️ Text"}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1 font-semibold uppercase tracking-wider text-[10px]">
+                        {message.inputType === "sign" && "🤟 Sign"}
+                        {message.inputType === "speech" && "🎙️ Voice"}
+                        {message.inputType === "text" && "⌨️ Text"}
+                      </span>
+
+                      {timeStr && (
+                        <span className="text-[10px] opacity-75 font-mono">
+                          • {timeStr}
+                        </span>
+                      )}
+
+                      {/* WhatsApp Delivery / Read Status Ticks (for outgoing messages) */}
+                      {isMine && (
+                        <span
+                          title={
+                            message.status === "read"
+                              ? "Read (Seen)"
+                              : message.status === "delivered"
+                              ? "Delivered"
+                              : "Sent"
+                          }
+                          className={`font-black tracking-tighter text-xs flex items-center ml-0.5 select-none ${
+                            message.status === "read"
+                              ? "text-blue-900 font-bold"
+                              : message.status === "delivered"
+                              ? "text-black/70"
+                              : "text-black/45"
+                          }`}
+                        >
+                          {message.status === "read" ? "✓✓" : message.status === "delivered" ? "✓✓" : "✓"}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Quick TTS and Sign Avatar Buttons */}
                     <div className="flex items-center gap-1.5">
