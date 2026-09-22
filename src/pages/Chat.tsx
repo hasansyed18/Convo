@@ -242,8 +242,8 @@ export default function Chat() {
 
   const otherUserId = conversation.participants.find((id) => id !== user.uid);
   const otherUserName = otherUserId
-    ? conversation.participantNames[otherUserId] || "KOMBO Friend"
-    : "KOMBO Friend";
+    ? conversation.participantNames[otherUserId] || "Convo Friend"
+    : "Convo Friend";
 
   return (
     <div

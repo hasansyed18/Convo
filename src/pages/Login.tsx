@@ -88,7 +88,7 @@ export default function Login() {
           </h1>
 
           <p className="text-slate-400 mt-2">
-            Sign in to continue with KOMBO.
+            Sign in to continue with Convo.
           </p>
         </div>
 

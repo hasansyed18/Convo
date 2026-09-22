@@ -38,7 +38,7 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-xl tracking-tight leading-none bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-                KOMBO
+                Convo
               </h1>
               <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400 tracking-wider uppercase">
                 v2.0 Pro
@@ -160,9 +160,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 3. KOMBO AI Assistant & Sign Tutor */}
+          {/* 3. Convo AI Assistant & Sign Tutor */}
           <div
-            onClick={() => navigate("/kombo")}
+            onClick={() => navigate("/convo")}
             className="group cursor-pointer rounded-3xl border border-purple-500/20 bg-slate-900/70 hover:bg-slate-900 hover:border-purple-500/50 p-6 sm:p-7 transition-all duration-200 shadow-xl hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden"
           >
             <div>
@@ -175,7 +175,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <h3 className="text-xl font-bold text-white group-hover:text-purple-400 transition">
-                Talk to KOMBO AI Tutor
+                Talk to Convo AI Tutor
               </h3>
               <p className="text-slate-400 text-sm mt-2.5 leading-relaxed">
                 Practice sign language gestures with live camera feedback, ask communication questions, test speech synthesis, and watch the avatar explain expressions.

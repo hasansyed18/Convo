@@ -57,7 +57,9 @@ class OfflineStorageService {
 
   public getCachedMessages(conversationId: string): CachedMessage[] {
     try {
-      const data = localStorage.getItem(`kombo_messages_${conversationId}`);
+      const data =
+        localStorage.getItem(`convo_messages_${conversationId}`) ||
+        localStorage.getItem(`kombo_messages_${conversationId}`);
       if (!data) return [];
       return JSON.parse(data);
     } catch {
@@ -67,7 +69,7 @@ class OfflineStorageService {
 
   public saveCachedMessages(conversationId: string, messages: CachedMessage[]) {
     try {
-      localStorage.setItem(`kombo_messages_${conversationId}`, JSON.stringify(messages));
+      localStorage.setItem(`convo_messages_${conversationId}`, JSON.stringify(messages));
     } catch (e) {
       console.warn("Could not save to localStorage:", e);
     }
@@ -82,7 +84,9 @@ class OfflineStorageService {
   // Accessibility Settings Cache
   public getAccessibilitySettings(): AccessibilitySettings {
     try {
-      const data = localStorage.getItem("kombo_accessibility");
+      const data =
+        localStorage.getItem("convo_accessibility") ||
+        localStorage.getItem("kombo_accessibility");
       if (data) return JSON.parse(data);
     } catch {
       // Ignore localStorage read errors
@@ -100,7 +104,7 @@ class OfflineStorageService {
 
   public saveAccessibilitySettings(settings: AccessibilitySettings) {
     try {
-      localStorage.setItem("kombo_accessibility", JSON.stringify(settings));
+      localStorage.setItem("convo_accessibility", JSON.stringify(settings));
     } catch {
       // Ignore localStorage write errors
     }

@@ -445,9 +445,9 @@ export default function SignCameraModal({ onInsertText, onClose }: SignCameraMod
                 <CheckCircle2 size={16} /> Controlled MVP Sign Vocabulary (Calibrated Rules)
               </h4>
               <p className="text-xs text-slate-300 leading-relaxed">
-                KOMBO strictly recognizes anatomical finger configurations and dynamic motion vectors.
+                Convo strictly recognizes anatomical finger configurations and dynamic motion vectors.
                 To be recognized, hold your hand steady for 7 frames (~230ms). If a pose is ambiguous,
-                KOMBO displays <em>"No confident sign detected"</em> rather than inventing false communication.
+                Convo displays <em>"No confident sign detected"</em> rather than inventing false communication.
               </p>
             </div>
 

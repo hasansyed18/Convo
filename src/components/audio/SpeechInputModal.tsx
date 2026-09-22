@@ -12,6 +12,7 @@ import {
   Square,
   Keyboard,
   CheckCircle2,
+  ShieldAlert,
 } from "lucide-react";
 import { speechRecognitionManager } from "../../services/speech/SpeechRecognitionManager";
 import { textToSpeechService } from "../../services/speech/textToSpeechService";
@@ -64,17 +65,56 @@ export default function SpeechInputModal({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isMountedRef = useRef(true);
 
+  // Check if accessing over insecure remote network IP on mobile (which blocks mic in Chrome/Safari)
+  const isNonSecureMobile =
+    typeof window !== "undefined" &&
+    !window.isSecureContext &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1";
+
+  const isListening = state === "LISTENING";
+
+  // Reactive waveform animation while listening to speech recognition
+  useEffect(() => {
+    if (!isListening || isRecordingAudio) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (!isMountedRef.current) return;
+      const isSpeaking = Boolean(interimTranscript);
+      const baseAmp = isSpeaking ? 0.75 : 0.35;
+      const randVol = Math.floor(baseAmp * 45 + Math.random() * 25);
+      const wave = Array.from({ length: 32 }, (_, i) => {
+        const sin = Math.sin(Date.now() / 140 + i * 0.45);
+        return sin * (baseAmp * 0.65 + Math.random() * 0.25);
+      });
+
+      setNoiseStats({
+        volumePercent: randVol,
+        decibels: -45 + Math.round(randVol * 0.4),
+        noiseLevel: randVol > 30 ? "moderate" : "quiet",
+        waveform: wave,
+      });
+    }, 90);
+
+    return () => {
+      clearInterval(interval);
+      if (isMountedRef.current) {
+        setNoiseStats({
+          volumePercent: 0,
+          decibels: -100,
+          noiseLevel: "quiet",
+          waveform: new Array(32).fill(0),
+        });
+      }
+    };
+  }, [isListening, isRecordingAudio, interimTranscript]);
+
   const startRecognition = useCallback(async (lang: string) => {
     setErrorCode(null);
     setErrorMessage("");
     setInterimTranscript("");
-
-    // Start hardware audio visualizer (runs 100% locally)
-    await audioNoiseService.startAnalyzing(undefined, (stats) => {
-      if (isMountedRef.current) {
-        setNoiseStats(stats);
-      }
-    });
 
     speechRecognitionManager.setLanguage(lang);
 
@@ -101,8 +141,8 @@ export default function SpeechInputModal({
         if (isMountedRef.current) {
           setErrorCode(code);
           setErrorMessage(message);
-          if (code === "network") {
-            // Automatically switch to Local Voice Mode so user is not blocked
+          if (code === "network" || code === "not-allowed") {
+            // Automatically surface Local Voice & Push-to-Talk Mode so user is not blocked
             setIsLocalVoiceMode(true);
             setState("IDLE");
           }
@@ -134,6 +174,9 @@ export default function SpeechInputModal({
   // Push-to-Talk Hardware Audio Recorder
   const handleStartAudioRecording = async () => {
     try {
+      // Pause speech recognition to release any competing audio threads
+      speechRecognitionManager.stop();
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
       const recorder = new MediaRecorder(stream);
@@ -148,6 +191,13 @@ export default function SpeechInputModal({
           prev ? prev : `[🎤 Voice Message (${recordingSeconds || 2}s)]`
         );
       };
+
+      // Feed the acquired audio stream directly to the local noise analyzer
+      void audioNoiseService.startAnalyzing(stream, (stats) => {
+        if (isMountedRef.current) {
+          setNoiseStats(stats);
+        }
+      });
 
       recorder.start(200);
       mediaRecorderRef.current = recorder;
@@ -167,6 +217,7 @@ export default function SpeechInputModal({
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
+    audioNoiseService.stopAnalyzing();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
@@ -236,7 +287,6 @@ export default function SpeechInputModal({
 
   const providers = speechRecognitionManager.getProviders();
   const confPercent = Math.round(confidence * 100);
-  const isListening = state === "LISTENING";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
@@ -244,22 +294,25 @@ export default function SpeechInputModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3.5 bg-slate-950/90">
           <div className="flex items-center gap-3">
-            <div
-              className={`relative flex h-10 w-10 items-center justify-center rounded-2xl ${
+            <button
+              type="button"
+              onClick={isListening ? handleStopListening : handleRetry}
+              title={isListening ? "Tap to pause listening" : "Tap to start listening"}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-2xl transition active:scale-95 ${
                 isListening
-                  ? "bg-emerald-500/20 text-emerald-400"
+                  ? "bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/40"
                   : isLocalVoiceMode
                   ? "bg-cyan-500/20 text-cyan-400"
                   : state === "ERROR"
                   ? "bg-rose-500/20 text-rose-400"
-                  : "bg-blue-500/20 text-blue-400"
+                  : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
               }`}
             >
               <Mic size={20} className={isListening ? "animate-pulse" : ""} />
               {(isListening || isRecordingAudio) && (
                 <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 animate-ping" />
               )}
-            </div>
+            </button>
             <div>
               <h3 className="font-bold text-base sm:text-lg text-white flex items-center gap-2">
                 Speech-to-Text Voice Input
@@ -287,7 +340,7 @@ export default function SpeechInputModal({
                   {isRecordingAudio
                     ? `RECORDING (${recordingSeconds}s)`
                     : isLocalVoiceMode
-                    ? "LOCAL VOICE SUITE ACTIVE"
+                    ? "LOCAL VOICE ACTIVE"
                     : state}
                 </span>
 
@@ -295,9 +348,9 @@ export default function SpeechInputModal({
                   {isRecordingAudio
                     ? "Capturing microphone..."
                     : isListening
-                    ? "Speak naturally into microphone"
+                    ? "Speak into microphone"
                     : isLocalVoiceMode
-                    ? "Hardware mic online"
+                    ? "Tap Start or Quick Phrases"
                     : "Ready"}
                 </span>
               </div>
@@ -314,6 +367,28 @@ export default function SpeechInputModal({
 
         {/* Content Body */}
         <div className="p-5 space-y-4 overflow-y-auto">
+          {/* Non-secure origin / Mobile IP warning banner */}
+          {isNonSecureMobile && (
+            <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-3.5 space-y-1.5 animate-in fade-in">
+              <div className="flex items-start gap-2 text-xs text-amber-200">
+                <ShieldAlert size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-white">
+                    Mobile HTTPS Notice ({window.location.hostname})
+                  </p>
+                  <p className="text-[11px] text-amber-300/85 leading-relaxed">
+                    Mobile Chrome & Safari restrict microphone access on plain HTTP over local Wi-Fi IPs. To test voice input on mobile:
+                  </p>
+                  <ul className="list-disc list-inside text-[11px] text-amber-300/80 space-y-0.5 pl-1">
+                    <li>Deploy to <strong>Vercel</strong> for automatic free HTTPS</li>
+                    <li>Or use USB port-forwarding (<code className="bg-slate-850 px-1 py-0.5 rounded text-cyan-300 font-mono">chrome://inspect</code>) to access via <code className="bg-slate-850 px-1 py-0.5 rounded text-cyan-300 font-mono">localhost:5173</code></li>
+                    <li>Or use the <strong>Quick Speech Soundboard</strong> & <strong>Voice Recording</strong> below</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Controls Bar: Language + Provider Selectors */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {/* Language Selector */}
@@ -360,17 +435,17 @@ export default function SpeechInputModal({
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-slate-300 flex items-center gap-1.5 font-medium">
                 <Volume2 size={14} className="text-emerald-400" />
-                Hardware Microphone Activity
+                Microphone Activity & Spectrum
               </span>
 
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                  noiseStats.volumePercent > 12
+                  isListening || isRecordingAudio
                     ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse"
                     : "bg-slate-800 text-slate-400 border border-slate-700"
                 }`}
               >
-                {noiseStats.volumePercent > 12 ? "Speaking Detected" : "Listening..."}
+                {isListening ? "Listening Active" : isRecordingAudio ? "Recording..." : "Idle"}
               </span>
             </div>
 
@@ -386,7 +461,7 @@ export default function SpeechInputModal({
                     key={idx}
                     style={{ height: `${heightPct}%` }}
                     className={`flex-1 rounded-full transition-all duration-75 ${
-                      noiseStats.volumePercent > 10
+                      isListening || isRecordingAudio
                         ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
                         : "bg-slate-700/60"
                     }`}
@@ -420,11 +495,11 @@ export default function SpeechInputModal({
                 <CheckCircle2 size={16} className="text-cyan-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <p className="font-semibold text-white">
-                    Local Voice Suite Active (No Network Needed)
+                    Local Voice Suite Active (No Network Required)
                   </p>
                   <p className="text-[11px] text-cyan-300/80 leading-relaxed">
-                    Browser cloud speech recognition is unreachable on this network/browser.
-                    Your hardware microphone is active! Use <strong>Push-to-Talk Recording</strong>,{" "}
+                    Browser cloud speech recognition is unreachable on this connection.
+                    Use <strong>Record Voice Audio Note</strong>,{" "}
                     <strong>Windows Voice Typing (Win + H)</strong>, or the{" "}
                     <strong>Quick Speech Soundboard</strong> below.
                   </p>
@@ -437,7 +512,7 @@ export default function SpeechInputModal({
                   <button
                     type="button"
                     onClick={handleStartAudioRecording}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white py-2 text-xs font-bold transition shadow"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white py-2 text-xs font-bold transition shadow active:scale-98"
                   >
                     <Mic size={14} /> Record Voice Audio Note
                   </button>
@@ -445,7 +520,7 @@ export default function SpeechInputModal({
                   <button
                     type="button"
                     onClick={handleStopAudioRecording}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-2 text-xs font-bold transition shadow animate-pulse"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-2 text-xs font-bold transition shadow animate-pulse active:scale-98"
                   >
                     <Square size={14} /> Stop Recording ({recordingSeconds}s)
                   </button>
@@ -454,9 +529,9 @@ export default function SpeechInputModal({
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 text-xs font-semibold transition"
+                  className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 text-xs font-semibold transition active:scale-98"
                 >
-                  <RefreshCw size={12} /> Retry Cloud STT
+                  <RefreshCw size={12} /> Retry Speech STT
                 </button>
               </div>
 
@@ -480,10 +555,10 @@ export default function SpeechInputModal({
               </div>
               <div>
                 <p className="text-xs font-semibold text-white">
-                  Windows Neural Voice Typing Shortcut
+                  Windows / Mobile Neural Voice Typing
                 </p>
                 <p className="text-[10px] text-slate-400">
-                  Click here and press <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-300 font-mono">Win + H</kbd> for instant offline dictation
+                  Tap text box & press <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-300 font-mono">Win + H</kbd> or mobile keyboard 🎙️ mic icon
                 </p>
               </div>
             </div>
@@ -543,7 +618,7 @@ export default function SpeechInputModal({
                 setTranscript(e.target.value);
                 setInterimTranscript("");
               }}
-              placeholder="Speak into microphone, use Win + H, or click a quick phrase above..."
+              placeholder="Speak into microphone, use mobile keyboard mic, or tap a quick phrase..."
               rows={3}
               className="w-full bg-transparent text-white text-sm sm:text-base leading-relaxed outline-none resize-none placeholder:text-slate-500 placeholder:italic"
             />
@@ -592,7 +667,7 @@ export default function SpeechInputModal({
               <button
                 type="button"
                 onClick={handleStopListening}
-                className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 text-xs sm:text-sm font-semibold text-slate-200 transition border border-slate-700"
+                className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 text-xs sm:text-sm font-semibold text-slate-200 transition border border-slate-700 active:scale-98"
               >
                 Stop Listening
               </button>
@@ -600,9 +675,9 @@ export default function SpeechInputModal({
               <button
                 type="button"
                 onClick={handleRetry}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 text-xs sm:text-sm font-semibold text-slate-200 transition border border-slate-700"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 py-3 text-xs sm:text-sm font-bold text-white transition shadow-lg shadow-blue-600/20 active:scale-98"
               >
-                <Mic size={14} className="text-emerald-400" /> Start Listening
+                <Mic size={14} /> Start Listening
               </button>
             )}
 
@@ -610,7 +685,7 @@ export default function SpeechInputModal({
               type="button"
               onClick={handleSend}
               disabled={!transcript.trim() && !interimTranscript.trim()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed py-3 text-xs sm:text-sm font-bold text-black transition shadow-lg"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed py-3 text-xs sm:text-sm font-bold text-black transition shadow-lg active:scale-98"
             >
               <Send size={15} /> Confirm & Send
             </button>

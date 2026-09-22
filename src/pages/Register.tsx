@@ -46,7 +46,7 @@ export default function Register() {
           </div>
 
           <h1 className="text-4xl font-bold">
-            Welcome to KOMBO
+            Welcome to Convo
           </h1>
 
           <p className="text-slate-400 mt-2">

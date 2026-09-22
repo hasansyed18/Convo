@@ -11,7 +11,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
 import Chats from "./pages/Chats";
 import Chat from "./pages/Chat";
-import Kombo from "./pages/Kombo";
+import Convo from "./pages/Convo";
 import FaceToFaceCommunicator from "./pages/FaceToFaceCommunicator";
 import SignDictionary from "./pages/SignDictionary";
 import Contacts from "./pages/Contacts";
@@ -33,7 +33,8 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/chats" element={<Chats />} />
           <Route path="/chat/:conversationId" element={<Chat />} />
-          <Route path="/kombo" element={<Kombo />} />
+          <Route path="/convo" element={<Convo />} />
+          <Route path="/kombo" element={<Navigate to="/convo" replace />} />
           <Route path="/face-to-face" element={<FaceToFaceCommunicator />} />
           <Route path="/dictionary" element={<SignDictionary />} />
           <Route path="/contacts" element={<Contacts />} />

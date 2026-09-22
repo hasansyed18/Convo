@@ -230,7 +230,7 @@ export default function Chats() {
 
             <div>
               <h1 className="text-xl font-bold">
-                KOMBO Chats
+                Convo Chats
               </h1>
 
               <p className="text-xs text-emerald-400">
@@ -373,8 +373,8 @@ export default function Chats() {
                         .participantNames[
                         otherUserId
                       ] ||
-                      "KOMBO User"
-                    : "KOMBO User";
+                      "Convo User"
+                    : "Convo User";
 
                 return (
                   <button
@@ -434,7 +434,7 @@ export default function Chats() {
           currentUserId={user.uid}
           currentUserName={
             user.displayName ||
-            "KOMBO User"
+            "Convo User"
           }
           currentUserEmail={
             user.email || ""
@@ -625,7 +625,7 @@ function AddFriendModal({
 
       if (!foundUser) {
         setMessage(
-          "No KOMBO user found with this email."
+          "No Convo user found with this email."
         );
 
         setError(true);
@@ -652,7 +652,7 @@ function AddFriendModal({
       setResult(foundUser);
 
       setMessage(
-        "KOMBO user found ✓"
+        "Convo user found ✓"
       );
 
       setError(false);
