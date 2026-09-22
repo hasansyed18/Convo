@@ -49,6 +49,7 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
   private activeOptions: SpeechRecognitionProviderOptions | null = null;
   private isRunning = false;
   private pendingInterimText = "";
+  private lastProcessedIndex = 0;
   private restartTimeout: ReturnType<typeof setTimeout> | null = null;
 
   public isAvailable(): boolean {
@@ -137,6 +138,7 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
         this.recognitionInstance = null;
       }
 
+      this.lastProcessedIndex = 0;
       const instance = new RecognitionClass();
       const isMobile = this.isMobileDevice();
 
@@ -154,11 +156,12 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
 
       instance.onresult = (event: ISpeechRecognitionEvent) => {
         let interimText = "";
-        let finalText = "";
+        let newFinalText = "";
         let confidence = 0.85;
 
-        // Iterate through all results starting from event.resultIndex
-        const startIdx = typeof event.resultIndex === "number" ? event.resultIndex : 0;
+        // Prevent duplicate emission of already finalized items across events
+        const eventIdx = typeof event.resultIndex === "number" ? event.resultIndex : 0;
+        const startIdx = Math.max(eventIdx, this.lastProcessedIndex);
 
         for (let i = startIdx; i < event.results.length; ++i) {
           const item = event.results[i];
@@ -168,33 +171,25 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
           if (conf > 0) confidence = conf;
 
           if (item.isFinal) {
-            finalText += text;
+            newFinalText += (newFinalText ? " " : "") + text.trim();
+            this.lastProcessedIndex = i + 1;
           } else {
-            interimText += text;
+            interimText += (interimText ? " " : "") + text.trim();
           }
         }
 
-        // Secondary fallback if resultIndex skipped results on mobile Blink/WebKit engines
-        if (!finalText && !interimText && event.results.length > 0) {
-          for (let i = 0; i < event.results.length; ++i) {
-            const item = event.results[i];
-            if (!item) continue;
-            const text = item[0]?.transcript || "";
-            if (item.isFinal) {
-              finalText += text;
-            } else {
-              interimText += text;
-            }
-          }
-        }
-
-        if (finalText.trim()) {
+        if (newFinalText.trim()) {
           this.pendingInterimText = "";
-          this.activeCallbacks?.onFinalResult(finalText.trim(), Math.round(confidence * 100) / 100);
+          this.activeCallbacks?.onFinalResult(newFinalText.trim(), Math.round(confidence * 100) / 100);
           this.activeCallbacks?.onStateChange("LISTENING");
-        } else if (interimText.trim()) {
+        }
+
+        if (interimText.trim()) {
           this.pendingInterimText = interimText.trim();
           this.activeCallbacks?.onInterimResult(interimText.trim(), Math.round(confidence * 100) / 100);
+        } else if (newFinalText.trim()) {
+          this.pendingInterimText = "";
+          this.activeCallbacks?.onInterimResult("", Math.round(confidence * 100) / 100);
         }
       };
 
@@ -292,6 +287,7 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
 
   public async stop(): Promise<void> {
     this.isRunning = false;
+    this.lastProcessedIndex = 0;
     if (this.restartTimeout) {
       clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
@@ -313,6 +309,7 @@ export class BrowserSpeechRecognitionProvider implements SpeechRecognitionProvid
 
   public async abort(): Promise<void> {
     this.isRunning = false;
+    this.lastProcessedIndex = 0;
     if (this.restartTimeout) {
       clearTimeout(this.restartTimeout);
       this.restartTimeout = null;

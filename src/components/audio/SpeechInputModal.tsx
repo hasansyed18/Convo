@@ -31,6 +31,39 @@ interface SpeechInputModalProps {
   onClose: () => void;
 }
 
+function mergeTranscripts(existing: string, incoming: string): string {
+  const ext = existing.trim();
+  const inc = incoming.trim();
+  if (!ext) return inc;
+  if (!inc) return ext;
+
+  // 1. If incoming text already contains existing text at start, incoming is the fuller version
+  if (inc.toLowerCase().startsWith(ext.toLowerCase())) {
+    return inc;
+  }
+
+  // 2. If existing text already ends with incoming text, incoming is redundant
+  if (ext.toLowerCase().endsWith(inc.toLowerCase())) {
+    return ext;
+  }
+
+  // 3. Check for word-level suffix/prefix overlap
+  const extWords = ext.split(/\s+/);
+  const incWords = inc.split(/\s+/);
+
+  const maxOverlap = Math.min(extWords.length, incWords.length);
+  for (let len = maxOverlap; len > 0; len--) {
+    const extTail = extWords.slice(extWords.length - len).join(" ").toLowerCase();
+    const incHead = incWords.slice(0, len).join(" ").toLowerCase();
+    if (extTail === incHead) {
+      return `${extWords.slice(0, extWords.length - len).join(" ")} ${incWords.join(" ")}`.trim();
+    }
+  }
+
+  // 4. No overlap detected: append cleanly
+  return `${ext} ${inc}`;
+}
+
 export default function SpeechInputModal({
   onInsertText,
   onClose,
@@ -132,13 +165,7 @@ export default function SpeechInputModal({
       },
       onFinalResult: (text, conf) => {
         if (isMountedRef.current) {
-          setTranscript((prev) => {
-            const cleanText = text.trim();
-            if (!cleanText) return prev;
-            // Prevent duplicate word appending if text already ends with this phrase
-            if (prev.endsWith(cleanText)) return prev;
-            return prev ? `${prev} ${cleanText}` : cleanText;
-          });
+          setTranscript((prev) => mergeTranscripts(prev, text));
           setInterimTranscript("");
           if (conf > 0) setConfidence(conf);
         }
@@ -286,14 +313,14 @@ export default function SpeechInputModal({
   };
 
   const handleTestTTS = () => {
-    const fullText = (transcript + " " + interimTranscript).trim();
+    const fullText = mergeTranscripts(transcript, interimTranscript).trim();
     if (fullText) {
       textToSpeechService.speak(fullText, { lang: selectedLanguage });
     }
   };
 
   const handleSend = () => {
-    const fullText = (transcript + " " + interimTranscript).trim();
+    const fullText = mergeTranscripts(transcript, interimTranscript).trim();
     if (fullText) {
       onInsertText(fullText, true);
       onClose();
@@ -630,9 +657,7 @@ export default function SpeechInputModal({
               ref={textareaRef}
               value={
                 interimTranscript
-                  ? transcript
-                    ? `${transcript} ${interimTranscript}`
-                    : interimTranscript
+                  ? mergeTranscripts(transcript, interimTranscript)
                   : transcript
               }
               onChange={(e) => {
