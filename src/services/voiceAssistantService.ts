@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { sendMessage } from "./messageService";
+import { e2eeService } from "./crypto/e2eeService";
 import { textToSpeechService } from "./speech/textToSpeechService";
 import { getAssistantStrings } from "./voiceAssistantTranslations";
 
@@ -674,11 +675,28 @@ export class VoiceAssistantService {
         timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       }
 
+      let resolvedText = mData.text || "";
+      if (mData.ciphertext && mData.iv) {
+        try {
+          const otherUid = mData.senderId === userId ? match.otherUserId : mData.senderId;
+          resolvedText = await e2eeService.decryptFromConversation(
+            match.conversationId,
+            userId,
+            otherUid,
+            mData.ciphertext,
+            mData.iv
+          );
+        } catch (decErr) {
+          console.warn("Could not decrypt message for voice assistant:", decErr);
+          resolvedText = "The message is encrypted and could not be decrypted on this device.";
+        }
+      }
+
       return {
         found: true,
         conversationId: match.conversationId,
         contactName: match.contactName,
-        text: mData.text || "",
+        text: resolvedText,
         senderName,
         timeStr,
       };

@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "./firebase";
+import { e2eeService } from "./crypto/e2eeService";
 
 export async function registerUser(
   name: string,
@@ -31,15 +32,27 @@ export async function registerUser(
     displayName: name,
   });
 
+  // Generate & register ECDH identity keypair locally on device
+  let publicKeyJWK: JsonWebKey | null = null;
+  try {
+    publicKeyJWK = await e2eeService.ensureUserIdentity(user.uid);
+  } catch (err) {
+    console.warn("Could not generate initial cryptographic keypair during registration:", err);
+  }
+
   /*
-   * Create user profile in Firestore
+   * Create user profile in Firestore with public key only
+   * (Private key remains safely stored in client-side IndexedDB)
    */
   await setDoc(doc(db, "users", user.uid), {
     uid: user.uid,
     name,
     email: email.trim(),
-emailLower: email.trim().toLowerCase(),
+    emailLower: email.trim().toLowerCase(),
     photoURL: user.photoURL ?? null,
+
+    publicKeyJWK: publicKeyJWK ?? null,
+    e2eeEnabled: true,
 
     communicationMode: "text",
     preferredLanguage: "en",
@@ -69,9 +82,17 @@ export async function loginUser(
     password
   );
 
+  // Initialize or restore ECDH identity keys for this device session
+  try {
+    await e2eeService.ensureUserIdentity(result.user.uid);
+  } catch (err) {
+    console.warn("Could not verify cryptographic identity on login:", err);
+  }
+
   return result.user;
 }
 
 export async function logoutUser() {
+  e2eeService.clearSessionCache();
   await signOut(auth);
 }

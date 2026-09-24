@@ -34,6 +34,7 @@ import {
 import {
   getOrCreateConversation,
 } from "../services/conversationService";
+import { decryptLastMessageSnippet } from "../services/messageService";
 
 interface Conversation {
   id: string;
@@ -45,10 +46,52 @@ interface Conversation {
   };
 
   lastMessage?: string;
+  lastMessageCiphertext?: string;
+  lastMessageIv?: string;
   lastMessageSenderId?: string;
 
   createdAt?: { seconds: number; nanoseconds: number } | null;
   updatedAt?: { seconds: number; nanoseconds: number } | null;
+}
+
+function ConversationSnippet({
+  conversation,
+  currentUserId,
+}: {
+  conversation: Conversation;
+  currentUserId: string;
+}) {
+  const [decryptedText, setDecryptedText] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (conversation.lastMessageCiphertext && conversation.lastMessageIv && currentUserId) {
+      const otherUserId =
+        conversation.participants.find((id) => id !== currentUserId) || "";
+      decryptLastMessageSnippet(
+        conversation.id,
+        currentUserId,
+        otherUserId,
+        conversation.lastMessageCiphertext,
+        conversation.lastMessageIv
+      )
+        .then((res) => {
+          if (isMounted) setDecryptedText(res);
+        })
+        .catch(() => {
+          if (isMounted) setDecryptedText("🔒 Encrypted message");
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [conversation, currentUserId]);
+
+  if (decryptedText) {
+    return <span className="flex items-center gap-1">🔒 {decryptedText}</span>;
+  }
+
+  return <span>{conversation.lastMessage || "Start a conversation"}</span>;
 }
 
 interface FriendRequest {
@@ -419,8 +462,10 @@ export default function Chats() {
                       </div>
 
                       <p className="mt-1 truncate text-sm text-slate-400">
-                        {conversation.lastMessage ||
-                          "Start a conversation"}
+                        <ConversationSnippet
+                          conversation={conversation}
+                          currentUserId={user.uid}
+                        />
                       </p>
 
                     </div>

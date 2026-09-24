@@ -6,6 +6,7 @@ import {
 
 import {
   ArrowLeft,
+  Lock,
   Mic,
   Send,
   Volume2,
@@ -49,6 +50,9 @@ interface ChatMessage {
   senderId: string;
   receiverId: string;
   text: string;
+  ciphertext?: string;
+  iv?: string;
+  isEncrypted?: boolean;
   inputType: "text" | "speech" | "sign";
   status?: "sent" | "delivered" | "read";
   deliveredAt?: { seconds: number; nanoseconds?: number; toDate?: () => Date } | null;
@@ -169,7 +173,7 @@ export default function Chat() {
       prevMessagesCountRef.current = data.length;
     }, (error) => {
       console.warn("Could not subscribe to messages:", error);
-    });
+    }, user.uid);
 
     return unsubscribe;
   }, [conversationId, user, settings]);
@@ -293,9 +297,18 @@ export default function Chat() {
             <h1 className="font-bold text-base leading-tight flex items-center gap-2">
               <span>{otherUserName}</span>
             </h1>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
-              <span>●</span> Two-Way Assistive Active
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-emerald-400 flex items-center gap-1">
+                <span>●</span> Two-Way Assistive Active
+              </p>
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] text-emerald-300 font-mono"
+                title="Client-Side End-to-End Encrypted (ECDH P-256 + AES-GCM-256)"
+              >
+                <Lock size={10} />
+                <span>E2EE</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -414,6 +427,11 @@ export default function Chat() {
                   >
                     <div className="flex items-center gap-1.5">
                       <span className="flex items-center gap-1 font-semibold uppercase tracking-wider text-[10px]">
+                        {message.isEncrypted && (
+                          <span title="Client-Side End-to-End Encrypted" className="text-[10px] opacity-80 mr-0.5">
+                            🔒
+                          </span>
+                        )}
                         {message.inputType === "sign" && "🤟 Sign"}
                         {message.inputType === "speech" && "🎙️ Voice"}
                         {message.inputType === "text" && "⌨️ Text"}

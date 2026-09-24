@@ -12,6 +12,7 @@ import {
 } from "firebase/auth";
 
 import { auth } from "../services/firebase";
+import { e2eeService } from "../services/crypto/e2eeService";
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +38,12 @@ export function AuthProvider({
       (currentUser) => {
         setUser(currentUser);
         setLoading(false);
+
+        if (currentUser) {
+          e2eeService.ensureUserIdentity(currentUser.uid).catch((err) => {
+            console.warn("Failed to initialize cryptographic identity:", err);
+          });
+        }
       }
     );
 
